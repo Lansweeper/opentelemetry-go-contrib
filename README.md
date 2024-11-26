@@ -1,5 +1,17 @@
 # OpenTelemetry-Go Contrib
 
+## Reason for the fork
+The primary reason for forking was to enable the addition of a custom marshaller for telemetry in Go, which was not natively supported by the official library.
+One key use case: Adding labels to telemetry data, especially for database interactions, to include the statement length.  
+This enables better analysis during database performance degradation by identifying patterns like increased average entity size.  
+Efforts were made to contribute this feature upstream to the official library, but:   
+- The library had no active maintainers at the time.  
+- The contribution required signing a legal agreement, which stalled progress.  
+Consequently, this fork was created as the most viable solution.  
+
+Review the initial customizations made to the fork:  
+[Pull Request #1](https://github.com/Lansweeper/opentelemetry-go-contrib/pull/1/files)  
+
 [![build_and_test](https://github.com/open-telemetry/opentelemetry-go-contrib/workflows/build_and_test/badge.svg)](https://github.com/open-telemetry/opentelemetry-go-contrib/actions?query=workflow%3Abuild_and_test+branch%3Amain)
 [![codecov.io](https://codecov.io/gh/open-telemetry/opentelemetry-go-contrib/coverage.svg?branch=main)](https://app.codecov.io/gh/open-telemetry/opentelemetry-go-contrib?branch=main)
 [![Docs](https://godoc.org/go.opentelemetry.io/contrib?status.svg)](https://pkg.go.dev/go.opentelemetry.io/contrib)
