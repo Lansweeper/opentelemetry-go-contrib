@@ -7,9 +7,8 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/Lansweeper/opentelemetry-go-contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 	"github.com/stretchr/testify/assert"
-
-	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 )
 
 // regex taken from https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string

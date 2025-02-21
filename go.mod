@@ -2,7 +2,10 @@ module github.com/Lansweeper/opentelemetry-go-contrib
 
 go 1.22
 
-require github.com/stretchr/testify v1.10.0
+require (
+	github.com/stretchr/testify v1.10.0
+	go.opentelemetry.io/contrib v1.34.0
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
