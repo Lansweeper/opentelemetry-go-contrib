@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 // Based on https://github.com/DataDog/dd-trace-go/blob/8fb554ff7cf694267f9077ae35e27ce4689ed8b6/contrib/gin-gonic/gin/gintrace_test.go
 
@@ -23,17 +12,15 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-
-	"go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
@@ -52,7 +39,7 @@ func TestChildSpanFromGlobalTracer(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, r)
-	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'user' handler")
+	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'user' handler") //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 	assert.Len(t, sr.Ended(), 1)
 }
 
@@ -70,7 +57,7 @@ func TestChildSpanFromCustomTracer(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, r)
-	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'user' handler")
+	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'user' handler") //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 	assert.Len(t, sr.Ended(), 1)
 }
 
@@ -90,14 +77,14 @@ func TestTrace200(t *testing.T) {
 
 	// do and verify the request
 	router.ServeHTTP(w, r)
-	response := w.Result()
+	response := w.Result() //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 	require.Equal(t, http.StatusOK, response.StatusCode)
 
 	// verify traces look good
 	spans := sr.Ended()
 	require.Len(t, spans, 1)
 	span := spans[0]
-	assert.Equal(t, "/user/:id", span.Name())
+	assert.Equal(t, "GET /user/:id", span.Name())
 	assert.Equal(t, oteltrace.SpanKindServer, span.SpanKind())
 	attrs := span.Attributes()
 	assert.Contains(t, attrs, attribute.String("net.host.name", "foobar"))
@@ -122,14 +109,14 @@ func TestError(t *testing.T) {
 	r := httptest.NewRequest("GET", "/server_err", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
-	response := w.Result()
+	response := w.Result() //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
 
 	// verify the errors and status are correct
 	spans := sr.Ended()
 	require.Len(t, spans, 1)
 	span := spans[0]
-	assert.Equal(t, "/server_err", span.Name())
+	assert.Equal(t, "GET /server_err", span.Name())
 	attrs := span.Attributes()
 	assert.Contains(t, attrs, attribute.String("net.host.name", "foobar"))
 	assert.Contains(t, attrs, attribute.Int("http.status_code", http.StatusInternalServerError))
@@ -188,7 +175,7 @@ func TestStatusError(t *testing.T) {
 			spans := sr.Ended()
 			require.Len(t, spans, 1)
 			span := spans[0]
-			assert.Equal(t, "/err", span.Name())
+			assert.Equal(t, "GET /err", span.Name())
 			assert.Equal(t, tc.spanCode, span.Status().Code)
 
 			attrs := span.Attributes()
@@ -212,4 +199,60 @@ func TestErrorNotSwallowedByMiddleware(t *testing.T) {
 
 	err := h(c)
 	assert.Equal(t, assert.AnError, err)
+}
+
+func TestSpanNameFormatter(t *testing.T) {
+	imsb := tracetest.NewInMemoryExporter()
+	provider := trace.NewTracerProvider(trace.WithSyncer(imsb))
+
+	tests := []struct {
+		name     string
+		method   string
+		path     string
+		url      string
+		expected string
+	}{
+		// Test for standard methods
+		{"standard method of GET", http.MethodGet, "/user/:id", "/user/123", "GET /user/:id"},
+		{"standard method of HEAD", http.MethodHead, "/user/:id", "/user/123", "HEAD /user/:id"},
+		{"standard method of POST", http.MethodPost, "/user/:id", "/user/123", "POST /user/:id"},
+		{"standard method of PUT", http.MethodPut, "/user/:id", "/user/123", "PUT /user/:id"},
+		{"standard method of PATCH", http.MethodPatch, "/user/:id", "/user/123", "PATCH /user/:id"},
+		{"standard method of DELETE", http.MethodDelete, "/user/:id", "/user/123", "DELETE /user/:id"},
+		{"standard method of CONNECT", http.MethodConnect, "/user/:id", "/user/123", "CONNECT /user/:id"},
+		{"standard method of OPTIONS", http.MethodOptions, "/user/:id", "/user/123", "OPTIONS /user/:id"},
+		{"standard method of TRACE", http.MethodTrace, "/user/:id", "/user/123", "TRACE /user/:id"},
+		{"standard method of GET, but it's another route.", http.MethodGet, "/", "/", "GET /"},
+
+		// Test for no route
+		{"no route", http.MethodGet, "/", "/user/id", "GET"},
+
+		// Test for case-insensitive method
+		{"all lowercase", "get", "/user/123", "/user/123", "GET /user/123"},
+		{"partial capitalization", "Get", "/user/123", "/user/123", "GET /user/123"},
+		{"full capitalization", "GET", "/user/:id", "/user/123", "GET /user/:id"},
+
+		// Test for invalid method
+		{"invalid method", "INVALID", "/user/123", "/user/123", "HTTP /user/123"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer imsb.Reset()
+
+			router := echo.New()
+			router.Use(otelecho.Middleware("foobar", otelecho.WithTracerProvider(provider)))
+			router.Add(test.method, test.path, func(c echo.Context) error {
+				return c.NoContent(http.StatusOK)
+			})
+
+			r := httptest.NewRequest(test.method, test.url, nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, r)
+
+			spans := imsb.GetSpans()
+			require.Len(t, spans, 1)
+			assert.Equal(t, test.expected, spans[0].Name)
+		})
+	}
 }

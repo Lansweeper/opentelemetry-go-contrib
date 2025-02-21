@@ -1,4 +1,6 @@
 // Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Copyright (c) 2021 The Jaeger Authors.
 // Copyright (c) 2017 Uber Technologies, Inc.
 //
@@ -286,7 +288,7 @@ func (f *httpSamplingStrategyFetcher) Fetch(serviceName string) ([]byte, error) 
 	v.Set("service", serviceName)
 	uri := f.serverURL + "?" + v.Encode()
 
-	resp, err := f.httpClient.Get(uri)
+	resp, err := f.httpClient.Get(uri) // nolint:bodyclose  // False-positive.
 	if err != nil {
 		return nil, err
 	}

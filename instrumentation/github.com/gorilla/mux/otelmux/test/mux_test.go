@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package test
 
@@ -29,6 +18,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
@@ -92,8 +83,14 @@ func TestSDKIntegration(t *testing.T) {
 	provider := sdktrace.NewTracerProvider()
 	provider.RegisterSpanProcessor(sr)
 
+	reader := sdkmetric.NewManualReader()
+	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+
 	router := mux.NewRouter()
-	router.Use(otelmux.Middleware("foobar", otelmux.WithTracerProvider(provider)))
+	router.Use(otelmux.Middleware("foobar",
+		otelmux.WithTracerProvider(provider),
+		otelmux.WithMeterProvider(meterProvider)))
+
 	router.HandleFunc("/user/{id:[0-9]+}", ok)
 	router.HandleFunc("/book/{title}", ok)
 
@@ -144,12 +141,12 @@ func TestNotFoundIsNotError(t *testing.T) {
 		attribute.String("http.method", "GET"),
 		attribute.String("http.route", "/does/not/exist"),
 	)
-	assert.Equal(t, sr.Ended()[0].Status().Code, codes.Unset)
+	assert.Equal(t, codes.Unset, sr.Ended()[0].Status().Code)
 }
 
 func assertSpan(t *testing.T, span sdktrace.ReadOnlySpan, name string, kind trace.SpanKind, attrs ...attribute.KeyValue) {
 	assert.Equal(t, name, span.Name())
-	assert.Equal(t, trace.SpanKindServer, span.SpanKind())
+	assert.Equal(t, kind, span.SpanKind())
 
 	got := make(map[attribute.Key]attribute.Value, len(span.Attributes()))
 	for _, a := range span.Attributes() {
@@ -159,7 +156,7 @@ func assertSpan(t *testing.T, span sdktrace.ReadOnlySpan, name string, kind trac
 		if !assert.Contains(t, got, want.Key) {
 			continue
 		}
-		assert.Equal(t, got[want.Key], want.Value)
+		assert.Equal(t, want.Value, got[want.Key])
 	}
 }
 
@@ -199,7 +196,7 @@ func TestWithPublicEndpoint(t *testing.T) {
 	prop.Inject(ctx, propagation.HeaderCarrier(r0.Header))
 
 	router.ServeHTTP(w, r0)
-	assert.Equal(t, http.StatusOK, w.Result().StatusCode)
+	assert.Equal(t, http.StatusOK, w.Result().StatusCode) //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 
 	// Recorded span should be linked with an incoming span context.
 	assert.NoError(t, sr.ForceFlush(ctx))
@@ -254,7 +251,7 @@ func TestWithPublicEndpointFn(t *testing.T) {
 			},
 			spansAssert: func(t *testing.T, _ trace.SpanContext, spans []sdktrace.ReadOnlySpan) {
 				require.Len(t, spans, 1)
-				require.Len(t, spans[0].Links(), 0, "should not contain link")
+				require.Empty(t, spans[0].Links(), "should not contain link")
 			},
 		},
 	}
@@ -284,12 +281,91 @@ func TestWithPublicEndpointFn(t *testing.T) {
 			prop.Inject(ctx, propagation.HeaderCarrier(r0.Header))
 
 			router.ServeHTTP(w, r0)
-			assert.Equal(t, http.StatusOK, w.Result().StatusCode)
+			assert.Equal(t, http.StatusOK, w.Result().StatusCode) //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 
 			// Recorded span should be linked with an incoming span context.
 			assert.NoError(t, sr.ForceFlush(ctx))
 			spans := sr.Ended()
 			tt.spansAssert(t, sc, spans)
 		})
+	}
+}
+
+func TestHandlerWithMetricAttributesFn(t *testing.T) {
+	const (
+		serverRequestSize  = "http.server.request.size"
+		serverResponseSize = "http.server.response.size"
+		serverDuration     = "http.server.duration"
+	)
+	testCases := []struct {
+		name                        string
+		fn                          func(r *http.Request) []attribute.KeyValue
+		expectedAdditionalAttribute []attribute.KeyValue
+	}{
+		{
+			name:                        "With a nil function",
+			fn:                          nil,
+			expectedAdditionalAttribute: []attribute.KeyValue{},
+		},
+		{
+			name: "With a function that returns an additional attribute",
+			fn: func(r *http.Request) []attribute.KeyValue {
+				return []attribute.KeyValue{
+					attribute.String("fooKey", "fooValue"),
+					attribute.String("barKey", "barValue"),
+				}
+			},
+			expectedAdditionalAttribute: []attribute.KeyValue{
+				attribute.String("fooKey", "fooValue"),
+				attribute.String("barKey", "barValue"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		reader := sdkmetric.NewManualReader()
+		meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+
+		router := mux.NewRouter()
+		router.Use(otelmux.Middleware("foobar",
+			otelmux.WithMeterProvider(meterProvider),
+			otelmux.WithMetricAttributesFn(tc.fn),
+		))
+
+		router.HandleFunc("/user/{id:[0-9]+}", ok)
+		r, err := http.NewRequest(http.MethodGet, "http://localhost/user/123", nil)
+		require.NoError(t, err)
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, r)
+
+		rm := metricdata.ResourceMetrics{}
+		err = reader.Collect(context.Background(), &rm)
+		require.NoError(t, err)
+		require.Len(t, rm.ScopeMetrics, 1)
+		assert.Len(t, rm.ScopeMetrics[0].Metrics, 3)
+
+		// Verify that the additional attribute is present in the metrics.
+		for _, m := range rm.ScopeMetrics[0].Metrics {
+			switch m.Name {
+			case serverRequestSize, serverResponseSize:
+				d, ok := m.Data.(metricdata.Sum[int64])
+				assert.True(t, ok)
+				assert.Len(t, d.DataPoints, 1)
+				containsAttributes(t, d.DataPoints[0].Attributes, testCases[0].expectedAdditionalAttribute)
+			case serverDuration:
+				d, ok := m.Data.(metricdata.Histogram[float64])
+				assert.True(t, ok)
+				assert.Len(t, d.DataPoints, 1)
+				containsAttributes(t, d.DataPoints[0].Attributes, testCases[0].expectedAdditionalAttribute)
+			}
+		}
+	}
+}
+
+func containsAttributes(t *testing.T, attrSet attribute.Set, expected []attribute.KeyValue) {
+	for _, att := range expected {
+		actualValue, ok := attrSet.Value(att.Key)
+		assert.True(t, ok)
+		assert.Equal(t, att.Value.AsString(), actualValue.AsString())
 	}
 }
