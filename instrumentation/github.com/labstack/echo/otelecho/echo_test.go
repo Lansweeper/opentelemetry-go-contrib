@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 // Based on https://github.com/DataDog/dd-trace-go/blob/8fb554ff7cf694267f9077ae35e27ce4689ed8b6/contrib/gin-gonic/gin/gintrace_test.go
 
@@ -25,12 +14,11 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 
+	b3prop "go.opentelemetry.io/contrib/propagators/b3"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
-
-	b3prop "go.opentelemetry.io/contrib/propagators/b3"
 )
 
 func TestGetSpanNotInstrumented(t *testing.T) {
@@ -45,7 +33,7 @@ func TestGetSpanNotInstrumented(t *testing.T) {
 	r := httptest.NewRequest("GET", "/ping", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
-	response := w.Result()
+	response := w.Result() //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 	assert.Equal(t, http.StatusOK, response.StatusCode)
 }
 
@@ -76,7 +64,7 @@ func TestPropagationWithGlobalPropagators(t *testing.T) {
 
 	router.ServeHTTP(w, r)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator())
-	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'user' handler")
+	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'user' handler") //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 }
 
 func TestPropagationWithCustomPropagators(t *testing.T) {
@@ -106,7 +94,7 @@ func TestPropagationWithCustomPropagators(t *testing.T) {
 	})
 
 	router.ServeHTTP(w, r)
-	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'user' handler")
+	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'user' handler") //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 }
 
 func TestSkipper(t *testing.T) {
@@ -127,5 +115,5 @@ func TestSkipper(t *testing.T) {
 	})
 
 	router.ServeHTTP(w, r)
-	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'ping' handler")
+	assert.Equal(t, http.StatusOK, w.Result().StatusCode, "should call the 'ping' handler") //nolint:bodyclose // False positive for httptest.ResponseRecorder: https://github.com/timakin/bodyclose/issues/59.
 }

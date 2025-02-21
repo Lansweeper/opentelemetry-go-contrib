@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package otelaws
 
@@ -42,7 +31,7 @@ func TestDynamodbTagsBatchGetItemInput(t *testing.T) {
 		},
 	}
 
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice("aws.dynamodb.table_names", []string{"table1"}))
 }
@@ -71,7 +60,7 @@ func TestDynamodbTagsBatchWriteItemInput(t *testing.T) {
 		},
 	}
 
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice("aws.dynamodb.table_names", []string{"table1"}))
 }
@@ -125,7 +114,7 @@ func TestDynamodbTagsCreateTableInput(t *testing.T) {
 		},
 	}
 
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.table_names", []string{"table1"},
@@ -133,7 +122,7 @@ func TestDynamodbTagsCreateTableInput(t *testing.T) {
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.global_secondary_indexes",
 		[]string{
-			`{"IndexName":"index1","KeySchema":[{"AttributeName":"attributename","KeyType":"HASH"}],"Projection":{"NonKeyAttributes":["non-key-attributes"],"ProjectionType":""},"ProvisionedThroughput":null}`,
+			`{"IndexName":"index1","KeySchema":[{"AttributeName":"attributename","KeyType":"HASH"}],"Projection":{"NonKeyAttributes":["non-key-attributes"],"ProjectionType":""},"OnDemandThroughput":null,"ProvisionedThroughput":null,"WarmThroughput":null}`,
 		},
 	))
 	assert.Contains(t, attributes, attribute.StringSlice(
@@ -155,7 +144,7 @@ func TestDynamodbTagsDeleteItemInput(t *testing.T) {
 			TableName: aws.String("table1"),
 		},
 	}
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.table_names", []string{"table1"},
@@ -168,7 +157,7 @@ func TestDynamodbTagsDeleteTableInput(t *testing.T) {
 			TableName: aws.String("table1"),
 		},
 	}
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.table_names", []string{"table1"},
@@ -181,7 +170,7 @@ func TestDynamodbTagsDescribeTableInput(t *testing.T) {
 			TableName: aws.String("table1"),
 		},
 	}
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.table_names", []string{"table1"},
@@ -195,7 +184,7 @@ func TestDynamodbTagsListTablesInput(t *testing.T) {
 			Limit:                   aws.Int32(10),
 		},
 	}
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.String("aws.dynamodb.exclusive_start_table", "table1"))
 	assert.Contains(t, attributes, attribute.Int("aws.dynamodb.limit", 10))
@@ -213,7 +202,7 @@ func TestDynamodbTagsPutItemInput(t *testing.T) {
 		},
 	}
 
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.table_names", []string{"table1"},
@@ -241,7 +230,7 @@ func TestDynamodbTagsQueryInput(t *testing.T) {
 		},
 	}
 
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.table_names", []string{"table1"},
@@ -268,7 +257,7 @@ func TestDynamodbTagsScanInput(t *testing.T) {
 		},
 	}
 
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.table_names", []string{"my-table"},
@@ -296,7 +285,7 @@ func TestDynamodbTagsUpdateItemInput(t *testing.T) {
 		},
 	}
 
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.table_names", []string{"my-table"},
@@ -337,7 +326,7 @@ func TestDynamodbTagsUpdateTableInput(t *testing.T) {
 		},
 	}
 
-	attributes := DynamoDBAttributeSetter(context.TODO(), input)
+	attributes := DynamoDBAttributeBuilder(context.TODO(), input, middleware.InitializeOutput{})
 
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.table_names", []string{"my-table"},
@@ -349,7 +338,7 @@ func TestDynamodbTagsUpdateTableInput(t *testing.T) {
 	assert.Contains(t, attributes, attribute.StringSlice(
 		"aws.dynamodb.global_secondary_index_updates",
 		[]string{
-			`{"Create":{"IndexName":"index1","KeySchema":[{"AttributeName":"attribute","KeyType":"HASH"}],"Projection":{"NonKeyAttributes":["attribute1","attribute2"],"ProjectionType":"ALL"},"ProvisionedThroughput":null},"Delete":null,"Update":null}`,
+			`{"Create":{"IndexName":"index1","KeySchema":[{"AttributeName":"attribute","KeyType":"HASH"}],"Projection":{"NonKeyAttributes":["attribute1","attribute2"],"ProjectionType":"ALL"},"OnDemandThroughput":null,"ProvisionedThroughput":null,"WarmThroughput":null},"Delete":null,"Update":null}`,
 		},
 	))
 	assert.Contains(t, attributes, attribute.Float64("aws.dynamodb.provisioned_read_capacity", 123))

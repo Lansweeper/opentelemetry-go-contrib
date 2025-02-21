@@ -1,26 +1,15 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package otelrestful // import "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 
 import (
 	"github.com/emicklei/go-restful/v3"
 
+	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful/internal/semconv"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful/internal/semconvutil"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
-	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
@@ -47,6 +36,8 @@ func OTelFilter(service string, opts ...Option) restful.FilterFunction {
 	if cfg.Propagators == nil {
 		cfg.Propagators = otel.GetTextMapPropagator()
 	}
+	semconvServer := semconv.NewHTTPServer(nil)
+
 	return func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
 		r := req.Request
 		ctx := cfg.Propagators.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
@@ -58,7 +49,7 @@ func OTelFilter(service string, opts ...Option) restful.FilterFunction {
 			oteltrace.WithSpanKind(oteltrace.SpanKindServer),
 		}
 		if route != "" {
-			rAttr := semconv.HTTPRoute(route)
+			rAttr := semconvServer.Route(route)
 			opts = append(opts, oteltrace.WithAttributes(rAttr))
 		}
 
