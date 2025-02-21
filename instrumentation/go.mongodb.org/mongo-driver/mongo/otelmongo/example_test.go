@@ -6,11 +6,10 @@ package otelmongo_test
 import (
 	"context"
 
+	"github.com/Lansweeper/opentelemetry-go-contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 )
 
 func Example() {
