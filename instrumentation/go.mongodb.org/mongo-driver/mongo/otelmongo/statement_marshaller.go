@@ -1,3 +1,6 @@
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package otelmongo // import "github.com/Lansweeper/opentelemetry-go-contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 
 import (
