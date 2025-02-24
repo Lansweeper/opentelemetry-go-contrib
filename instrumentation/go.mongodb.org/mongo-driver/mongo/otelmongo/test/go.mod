@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/Lansweeper/opentelemetry-go-contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo v0.0.0-20250205080730-3fc0155eaea9 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

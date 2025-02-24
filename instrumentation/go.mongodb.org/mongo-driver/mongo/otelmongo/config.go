@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otelmongo // import "go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
+package otelmongo // import "github.com/Lansweeper/opentelemetry-go-contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 
 import (
 	"go.opentelemetry.io/otel"
@@ -69,8 +69,8 @@ func WithCommandAttributeDisabled(disabled bool) Option {
 	})
 }
 
-// WithMarshaller sets the marshalled in chargee of managing the bson command that will be marshalled into the
-// db.statement attribute
+// WithMarshaller sets the marshaled in chargee of managing the bson command that will be marshaled into the
+// db.statement attribute.
 func WithMarshaller(marshaller StatementMarshaller) Option {
 	return optionFunc(func(cfg *config) {
 		cfg.statementMarshaller = marshaller

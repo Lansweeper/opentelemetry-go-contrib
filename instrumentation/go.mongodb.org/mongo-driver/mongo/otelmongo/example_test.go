@@ -39,7 +39,7 @@ func Example() {
 	}
 }
 
-func ExampleLimitedStatementMarshaller() {
+func ExampleNewLimitedStatementMarshaller() {
 	// connect to MongoDB
 	opts := options.Client()
 	opts.Monitor = otelmongo.NewMonitor(

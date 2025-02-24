@@ -1,3 +1,5 @@
+github.com/Lansweeper/opentelemetry-go-contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo v0.0.0-20250205080730-3fc0155eaea9 h1:bY15WYLAOslcMc3aTsiRGIRKXKVYVGw6TW/qxrx10Eo=
+github.com/Lansweeper/opentelemetry-go-contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo v0.0.0-20250205080730-3fc0155eaea9/go.mod h1:45Q0h2Nry2Pbvzt0Q2+ycwgmzcyq9N0qKOsi+vVJyxQ=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
