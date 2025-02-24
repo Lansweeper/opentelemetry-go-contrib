@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package otelaws // import "go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 
@@ -38,12 +27,17 @@ const (
 type spanTimestampKey struct{}
 
 // AttributeSetter returns an array of KeyValue pairs, it can be used to set custom attributes.
+//
+// Deprecated: Use AttributeBuilder instead. This will be removed in a future release.
 type AttributeSetter func(context.Context, middleware.InitializeInput) []attribute.KeyValue
 
+// AttributeBuilder returns an array of KeyValue pairs, it can be used to set custom attributes.
+type AttributeBuilder func(ctx context.Context, in middleware.InitializeInput, out middleware.InitializeOutput) []attribute.KeyValue
+
 type otelMiddlewares struct {
-	tracer          trace.Tracer
-	propagator      propagation.TextMapPropagator
-	attributeSetter []AttributeSetter
+	tracer            trace.Tracer
+	propagator        propagation.TextMapPropagator
+	attributeBuilders []AttributeBuilder
 }
 
 func (m otelMiddlewares) initializeMiddlewareBefore(stack *middleware.Stack) error {
@@ -72,9 +66,6 @@ func (m otelMiddlewares) initializeMiddlewareAfter(stack *middleware.Stack) erro
 			RegionAttr(region),
 			OperationAttr(operation),
 		}
-		for _, setter := range m.attributeSetter {
-			attributes = append(attributes, setter(ctx, in)...)
-		}
 
 		ctx, span := m.tracer.Start(ctx, spanName(serviceID, operation),
 			trace.WithTimestamp(ctx.Value(spanTimestampKey{}).(time.Time)),
@@ -84,12 +75,30 @@ func (m otelMiddlewares) initializeMiddlewareAfter(stack *middleware.Stack) erro
 		defer span.End()
 
 		out, metadata, err = next.HandleInitialize(ctx, in)
+		span.SetAttributes(m.buildAttributes(ctx, in, out)...)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 		}
 
 		return out, metadata, err
+	}),
+		middleware.After)
+}
+
+func (m otelMiddlewares) finalizeMiddlewareAfter(stack *middleware.Stack) error {
+	return stack.Finalize.Add(middleware.FinalizeMiddlewareFunc("OTelFinalizeMiddleware", func(
+		ctx context.Context, in middleware.FinalizeInput, next middleware.FinalizeHandler) (
+		out middleware.FinalizeOutput, metadata middleware.Metadata, err error,
+	) {
+		// Propagate the Trace information by injecting it into the HTTP request.
+		switch req := in.Request.(type) {
+		case *smithyhttp.Request:
+			m.propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
+		default:
+		}
+
+		return next.HandleFinalize(ctx, in)
 	}),
 		middleware.After)
 }
@@ -119,21 +128,12 @@ func (m otelMiddlewares) deserializeMiddleware(stack *middleware.Stack) error {
 		middleware.Before)
 }
 
-func (m otelMiddlewares) finalizeMiddleware(stack *middleware.Stack) error {
-	return stack.Finalize.Add(middleware.FinalizeMiddlewareFunc("OTelFinalizeMiddleware", func(
-		ctx context.Context, in middleware.FinalizeInput, next middleware.FinalizeHandler) (
-		out middleware.FinalizeOutput, metadata middleware.Metadata, err error,
-	) {
-		// Propagate the Trace information by injecting it into the HTTP request.
-		switch req := in.Request.(type) {
-		case *smithyhttp.Request:
-			m.propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
-		default:
-		}
+func (m otelMiddlewares) buildAttributes(ctx context.Context, in middleware.InitializeInput, out middleware.InitializeOutput) (attributes []attribute.KeyValue) {
+	for _, builder := range m.attributeBuilders {
+		attributes = append(attributes, builder(ctx, in, out)...)
+	}
 
-		return next.HandleFinalize(ctx, in)
-	}),
-		middleware.Before)
+	return attributes
 }
 
 func spanName(serviceID, operation string) string {
@@ -156,15 +156,15 @@ func AppendMiddlewares(apiOptions *[]func(*middleware.Stack) error, opts ...Opti
 		opt.apply(&cfg)
 	}
 
-	if cfg.AttributeSetter == nil {
-		cfg.AttributeSetter = []AttributeSetter{DefaultAttributeSetter}
+	if cfg.AttributeBuilders == nil {
+		cfg.AttributeBuilders = []AttributeBuilder{DefaultAttributeBuilder}
 	}
 
 	m := otelMiddlewares{
 		tracer: cfg.TracerProvider.Tracer(ScopeName,
 			trace.WithInstrumentationVersion(Version())),
-		propagator:      cfg.TextMapPropagator,
-		attributeSetter: cfg.AttributeSetter,
+		propagator:        cfg.TextMapPropagator,
+		attributeBuilders: cfg.AttributeBuilders,
 	}
-	*apiOptions = append(*apiOptions, m.initializeMiddlewareBefore, m.initializeMiddlewareAfter, m.finalizeMiddleware, m.deserializeMiddleware)
+	*apiOptions = append(*apiOptions, m.initializeMiddlewareBefore, m.initializeMiddlewareAfter, m.finalizeMiddlewareAfter, m.deserializeMiddleware)
 }

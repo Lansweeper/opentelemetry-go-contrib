@@ -1,22 +1,12 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package otellambda // import "go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 )
@@ -58,14 +48,14 @@ func validateReturns(handler reflect.Type) error {
 
 	switch n := handler.NumOut(); {
 	case n > 2:
-		return fmt.Errorf("handler may not return more than two values")
+		return errors.New("handler may not return more than two values")
 	case n == 2:
 		if !handler.Out(1).Implements(errorType) {
-			return fmt.Errorf("handler returns two values, but the second does not implement error")
+			return errors.New("handler returns two values, but the second does not implement error")
 		}
 	case n == 1:
 		if !handler.Out(0).Implements(errorType) {
-			return fmt.Errorf("handler returns a single value, but it does not implement error")
+			return errors.New("handler returns a single value, but it does not implement error")
 		}
 	}
 
@@ -73,7 +63,7 @@ func validateReturns(handler reflect.Type) error {
 }
 
 // Wraps and calls customer lambda handler then unpacks response as necessary.
-func (whf *wrappedHandlerFunction) wrapperInternals(ctx context.Context, handlerFunc interface{}, eventJSON []byte, event reflect.Value, takesContext bool) (interface{}, error) {
+func (whf *wrappedHandlerFunction) wrapperInternals(ctx context.Context, handlerFunc interface{}, eventJSON []byte, event reflect.Value, takesContext bool) (interface{}, error) { // nolint:revive // this control flag is required
 	wrappedLambdaHandler := reflect.ValueOf(whf.wrapper(handlerFunc))
 
 	argsWrapped := []reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(eventJSON), event, reflect.ValueOf(takesContext)}
@@ -99,7 +89,7 @@ func InstrumentHandler(handlerFunc interface{}, options ...Option) interface{} {
 	whf := wrappedHandlerFunction{instrumentor: newInstrumentor(options...)}
 
 	if handlerFunc == nil {
-		return errorHandler(fmt.Errorf("handler is nil"))
+		return errorHandler(errors.New("handler is nil"))
 	}
 	handlerType := reflect.TypeOf(handlerFunc)
 	if handlerType.Kind() != reflect.Func {

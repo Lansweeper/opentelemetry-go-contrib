@@ -1,4 +1,6 @@
 // Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Copyright (c) 2021 The Jaeger Authors.
 // Copyright (c) 2017 Uber Technologies, Inc.
 //
@@ -20,6 +22,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -129,7 +132,7 @@ func TestRemoteSamplerOptions(t *testing.T) {
 	assert.Equal(t, 42*time.Second, sampler.samplingRefreshInterval)
 	assert.Same(t, fetcher, sampler.samplingFetcher)
 	assert.Same(t, parser, sampler.samplingParser)
-	assert.EqualValues(t, sampler.updaters[0], &perOperationSamplerUpdater{MaxOperations: 42, OperationNameLateBinding: true})
+	assert.EqualValues(t, &perOperationSamplerUpdater{MaxOperations: 42, OperationNameLateBinding: true}, sampler.updaters[0])
 	assert.Equal(t, logger, sampler.logger)
 }
 
@@ -592,4 +595,92 @@ func TestSamplingStrategyParserImpl_Error(t *testing.T) {
 func TestDefaultSamplingStrategyFetcher_Timeout(t *testing.T) {
 	fetcher := newHTTPSamplingStrategyFetcher("")
 	assert.Equal(t, defaultRemoteSamplingTimeout, fetcher.httpClient.Timeout)
+}
+
+func TestEnvVarSettingForNewTracer(t *testing.T) {
+	type testConfig struct {
+		samplingServerURL       string
+		samplingRefreshInterval time.Duration
+	}
+
+	tests := []struct {
+		otelTraceSamplerArgs string
+		expErrs              []string
+		codeOptions          []Option
+		expConfig            testConfig
+	}{
+		{
+			otelTraceSamplerArgs: "endpoint=http://localhost:14250,pollingIntervalMs=5000,initialSamplingRate=0.25",
+			expErrs:              []string{},
+		},
+		{
+			otelTraceSamplerArgs: "endpointhttp://localhost:14250,pollingIntervalMs=5x000,initialSamplingRate=0.xyz25,invalidKey=invalidValue",
+			expErrs: []string{
+				"argument endpointhttp://localhost:14250 is not of type '<key>=<value>'",
+				"pollingIntervalMs parsing failed",
+				"initialSamplingRate parsing failed",
+				"invalid argument invalidKey in OTEL_TRACE_SAMPLER_ARG",
+			},
+		},
+		{
+			// Make sure we don't override values provided in code
+			otelTraceSamplerArgs: "endpoint=http://localhost:14250,pollingIntervalMs=5000,initialSamplingRate=0.25",
+			expErrs:              []string{},
+			codeOptions: []Option{
+				WithSamplingServerURL("http://localhost:5778"),
+			},
+			expConfig: testConfig{
+				samplingServerURL:       "http://localhost:5778",
+				samplingRefreshInterval: time.Millisecond * 5000,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run("", func(t *testing.T) {
+			t.Setenv("OTEL_TRACES_SAMPLER_ARG", test.otelTraceSamplerArgs)
+
+			_, errs := getEnvOptions()
+			require.Equal(t, len(test.expErrs), len(errs))
+
+			for i := range len(errs) {
+				require.ErrorContains(t, errs[i], test.expErrs[i])
+			}
+
+			if test.codeOptions != nil {
+				cfg := newConfig(test.codeOptions...)
+				require.Equal(t, test.expConfig.samplingServerURL, cfg.samplingServerURL)
+				require.Equal(t, test.expConfig.samplingRefreshInterval, cfg.samplingRefreshInterval)
+			}
+		})
+	}
+
+	t.Run("No-op when env var not set or empty", func(t *testing.T) {
+		for _, test := range []struct {
+			desc     string
+			envSetup func()
+		}{
+			{
+				"env var empty",
+				func() { t.Setenv("OTEL_TRACES_SAMPLER_ARG", "") },
+			},
+			{
+				"env var unset",
+				func() {
+					// t.Setenv to restore this environment variable at the end of the test
+					t.Setenv("OTEL_TRACES_SAMPLER_ARG", "")
+					// unset it during the test
+					require.NoError(t, os.Unsetenv("OTEL_TRACES_SAMPLER_ARG"))
+				},
+			},
+		} {
+			t.Run(test.desc, func(t *testing.T) {
+				test.envSetup()
+				opts, errs := getEnvOptions()
+
+				require.Empty(t, errs)
+				require.Empty(t, opts)
+			})
+		}
+	})
 }

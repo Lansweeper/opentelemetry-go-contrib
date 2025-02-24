@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package otelaws // import "go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 
@@ -25,7 +14,14 @@ import (
 )
 
 // SQSAttributeSetter sets SQS specific attributes depending on the SQS operation being performed.
+//
+// Deprecated: Use SQSAttributeBuilder instead. This will be removed in a future release.
 func SQSAttributeSetter(ctx context.Context, in middleware.InitializeInput) []attribute.KeyValue {
+	return SQSAttributeBuilder(ctx, in, middleware.InitializeOutput{})
+}
+
+// SQSAttributeBuilder sets SQS specific attributes depending on the SQS operation being performed.
+func SQSAttributeBuilder(ctx context.Context, in middleware.InitializeInput, out middleware.InitializeOutput) []attribute.KeyValue {
 	sqsAttributes := []attribute.KeyValue{semconv.MessagingSystem("AmazonSQS")}
 
 	key := semconv.NetPeerNameKey
